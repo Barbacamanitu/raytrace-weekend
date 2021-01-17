@@ -13,7 +13,7 @@ impl Hittable for Sphere {
     fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<Hit> {
         let oc = ray.origin - self.center;
         let a = ray.direction.length_squared();
-        let half_b = oc.dot(&ray.direction);
+        let half_b = Vec3::dot(&oc,&ray.direction);
         let c = oc.length_squared() - self.radius*self.radius;
     
         let discriminant = half_b*half_b - a*c;
@@ -31,7 +31,7 @@ impl Hittable for Sphere {
         }
         let point = ray.at(root);
         let outward_normal = (point - self.center) / self.radius;
-        let front_face:bool = ray.direction.dot(&outward_normal) < 0.0;
+        let front_face:bool = Vec3::dot(&ray.direction,&outward_normal) < 0.0;
         let normal :Vec3 = if front_face { outward_normal } else { outward_normal * -1.0};
         Some(Hit {
             t: root,

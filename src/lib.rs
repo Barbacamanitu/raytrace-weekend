@@ -7,7 +7,7 @@ pub mod raytracer;
 
 
 
-use raytracer::{camera::Camera, color, config::Config, material::{Lambertian, Material, Metal}, pixel::ColoredPixel, pixel::Pixel, ray};
+use raytracer::{camera::Camera, color, config::Config, material::{Dielectric, Lambertian, Material, Metal}, pixel::ColoredPixel, pixel::Pixel, ray};
 use raytracer::sphere::Sphere;
 use raytracer::hit::{Hit,Hittable,HittableList};
 use raytracer::ray::Ray;
@@ -37,20 +37,22 @@ fn calculate_progress(config: &Config, pixels_completed: u32) -> f64 {
 fn create_spheres() -> HittableList {
     let material_ground = Arc::new(Lambertian{albedo: Color{ r: 0.8, g: 0.8, b: 0.0}});
     let material_center = Arc::new(Lambertian{albedo: Color{ r: 0.7, g: 0.3, b: 0.3}});
-    let material_left = Arc::new(Metal{ albedo: Color{ r: 0.8, g: 0.8, b: 0.8}, fuzz: 0.3});
-    let material_right = Arc::new(Metal{ albedo: Color{ r: 0.8, g: 0.6, b: 0.2}, fuzz: 0.8});
+    let material_left = Arc::new(Dielectric{ ir: 1.5});
+    let material_right = Arc::new(Metal{ albedo: Color{ r: 0.8, g: 0.6, b: 0.2}, fuzz: 0.2});
 
 
 
     let sphere_a: Sphere = Sphere { center: Vec3{ x: 0.0,  y: -100.5, z: -1.0}, radius: 100.0,  mat: material_ground.clone()};
     let sphere_b: Sphere = Sphere { center: Vec3{ x: 0.0,  y: 0.0, z: -1.0}, radius: 0.5,       mat: material_center.clone()};
     let sphere_c: Sphere = Sphere { center: Vec3{ x: -1.0, y: 0.0, z: -1.0}, radius: 0.5,       mat: material_left.clone()};
+    let sphere_cc: Sphere = Sphere { center: Vec3{ x: -1.0, y: 0.0, z: -1.0}, radius: -0.4,       mat: material_left.clone()};
     let sphere_d: Sphere = Sphere { center: Vec3{ x: 1.0,  y: 0.0, z: -1.0}, radius: 0.5,       mat: material_right.clone()};
 
     let mut hittables: HittableList = HittableList::new();
     hittables.add(Box::new(sphere_a));
     hittables.add(Box::new(sphere_b));
     hittables.add(Box::new(sphere_c));
+    hittables.add(Box::new(sphere_cc));
     hittables.add(Box::new(sphere_d));
     hittables
 }
@@ -65,7 +67,10 @@ pub fn run(config: Config) {
 
     let begin = Instant::now();
 
-    let camera = Camera::at_position(Vec3{x: 0.0, y: 0.0, z: 0.0});
+    let camera_pos = Vec3{x: -2.0, y: 2.0, z: 1.0};
+    let camera_target = Vec3{x: 0.0, y: 0.0, z: -1.0};
+    let vup = Vec3{ x: 0.0, y: 1.0, z: 0.0};
+    let camera = Camera::new(camera_pos,camera_target, vup,90.0, 16.0/9.0);
     let pix_vec = Pixel::create_2d_vec(config.width, config.height);
     let spheres = create_spheres();
 

@@ -21,8 +21,12 @@ impl From<color::Color> for Vec3 {
 
 impl Vec3 {
 
-    pub fn dot(&self, other: &Vec3) -> f64 {
+    pub fn dot_with(&self, other: &Vec3) -> f64 {
         self.x * other.x + self.y * other.y + self.z * other.z
+    }
+
+    pub fn dot(a: &Vec3, b: &Vec3) -> f64 {
+        a.dot_with(b)
     }
 
     pub fn length(&self) -> f64 {
@@ -45,6 +49,15 @@ impl Vec3 {
     pub fn near_zero(&self) -> bool {
         let ep = std::f64::EPSILON;
         self.x.abs() < ep || self.y.abs() < ep || self.z.abs() < ep
+    }
+
+    pub fn cross(u: &Vec3,v: &Vec3) -> Vec3 {
+        Vec3 {
+            x: u.y * v.z - u.z * v.y,
+            y: u.z * v.x - u.x * v.z,
+            z: u.x * v.y - u.y * v.x
+        }
+
     }
 
     pub fn unit() -> Vec3 {
@@ -86,7 +99,23 @@ impl Vec3 {
     }
     
     pub fn reflect(&self,n: &Vec3) -> Vec3 {
-        *self - 2.0 * self.dot(n) * *n
+        *self - 2.0 * self.dot_with(n) * *n
+    }
+
+
+    /*
+    vec3 refract(const vec3& uv, const vec3& n, double etai_over_etat) {
+    auto cos_theta = fmin(dot(-uv, n), 1.0);
+    vec3 r_out_perp =  etai_over_etat * (uv + cos_theta*n);
+    vec3 r_out_parallel = -sqrt(fabs(1.0 - r_out_perp.length_squared())) * n;
+    return r_out_perp + r_out_parallel;
+}
+*/
+    pub fn refract(&self, n: &Vec3, etai_over_etat: f64) -> Vec3 {
+        let cos_theta = Vec3::dot(&(*self * -1.0),n).min(1.0);
+        let r_out_perp = etai_over_etat * (*self + (cos_theta * *n));
+        let r_out_parallel = ((1.0-r_out_perp.length_squared()).abs().sqrt() * -1.0) * *n;
+        r_out_perp + r_out_parallel
     }
 
 }
