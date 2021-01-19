@@ -2,11 +2,15 @@
 #![allow(dead_code,unused_imports,unused_variables)]
 extern crate image;
 extern crate rayon;
+extern crate imageproc;
+extern crate rusttype;
+use imageproc::drawing;
 use rayon::prelude::*;
 pub mod raytracer;
 
 
 
+use imageproc::rect::Rect;
 use raytracer::{camera::Camera, color, config::Config, material::{Dielectric, Lambertian, Material, Metal}, pixel::ColoredPixel, pixel::Pixel, ray};
 use raytracer::sphere::Sphere;
 use raytracer::hit::{Hit,Hittable,HittableList};
@@ -16,7 +20,11 @@ use raytracer::color::Color;
 
 
 use rand::random;
+use rusttype::Font;
+use rusttype::GlyphId;
+use rusttype::Scale;
 
+use std::path::Path;
 use std::{convert::From, sync::Arc};
 use assert_approx_eq::assert_approx_eq;
 use image::{ImageBuffer, Rgb, RgbImage};
@@ -57,8 +65,49 @@ fn create_spheres() -> HittableList {
     hittables
 }
 
+fn load_font() -> Option<rusttype::Font<'static>> {
+    let font_data: &[u8] = include_bytes!("../Roboto_Mono/static/RobotoMono-Medium.ttf");
+    Font::try_from_bytes(font_data)
+}
 
+fn add_config_watermark(img: &image::RgbImage, config: &Config, time: f32) -> RgbImage {
+    let mono_font = load_font().unwrap();
+    
+    //Colors
+    let bg = Rgb([50,50,50]);
+    let font_color = Rgb([51, 204, 204]);
 
+    let size_line = format!("Dimensions: {}x{}",config.width,config.height);
+    let samples_line = format!("Samples-per-pixel: {}",config.samples_per_pixel);
+    let bounce_line = format!("Bounces: {}",config.bounce_depth);
+    let time_line = format!("Rendered in {:.2} seconds",time);
+
+    let pixel_height = 20.0;
+    let line_height_scale = mono_font.scale_for_pixel_height(pixel_height);
+    let lines = vec![size_line,samples_line,bounce_line, time_line];
+    let longest_line = lines.iter().map(|line| line.len()).max().unwrap();
+    
+    let dim_w = (longest_line as f32);
+    let font_scale = Scale::uniform(10.0);
+    let glyphid = GlyphId(0);
+    let ref_glyph = mono_font.glyph(glyphid);
+    let scaled_g = mono_font.glyph(glyphid).scaled(font_scale);
+    let hmet = scaled_g.h_metrics();
+    let rect_w = (hmet.advance_width * 2.0 ) * dim_w;
+    let padding = 5i32;
+    let line_count = lines.len();
+    //BG Rectangle
+    let rect = Rect::at(10, 10).of_size(rect_w as u32, ((pixel_height + 5.0) * line_count as f32) as u32);
+    let draw_rect = Rect::at(rect.left() - padding, rect.top() - padding).of_size(rect.width() + (2 * padding as u32), rect.height()  + (2 * padding as u32));
+    let mut imgg = imageproc::drawing::draw_filled_rect(img,draw_rect,bg);
+    for (y,text) in lines.iter().enumerate() {
+        let text_y = rect.top() as f32 + (y as f32 * (pixel_height+5.0));
+        imgg = drawing::draw_text(&mut imgg, font_color, rect.left() as u32, text_y as u32,  Scale::uniform(pixel_height), &mono_font, &text);
+    }
+
+    
+    imgg
+}
 
 
 
@@ -67,7 +116,7 @@ pub fn run(config: Config) {
 
     let begin = Instant::now();
 
-    let camera_pos = Vec3{x: -2.0, y: 2.0, z: 1.0};
+    let camera_pos = Vec3{x: -0.0, y: 1.0, z: 1.0};
     let camera_target = Vec3{x: 0.0, y: 0.0, z: -1.0};
     let vup = Vec3{ x: 0.0, y: 1.0, z: 0.0};
     let camera = Camera::new(camera_pos,camera_target, vup,90.0, 16.0/9.0);
@@ -106,15 +155,23 @@ pub fn run(config: Config) {
         parallel_img[(pix.x,pix.y)] = Rgb::from(pix.color);
     }
 
-    let parallel_time = begin.elapsed().as_secs_f64();
+    let parallel_time = begin.elapsed().as_secs_f32();
     println!("Generated image (in parallel) in {:.2} seconds.",parallel_time);
-    let start_serial = Instant::now();
 
+    let out_dir = Path::new("renders");
+    let fname_format = format!("render-{}x{},{} samples,{} bounces.png",config.width,config.height,config.samples_per_pixel,config.bounce_depth);
+    let fname = Path::new(&fname_format);
+    let out_file = out_dir.join(fname);
 
-    let fname = "parallel_render.png";
-    match parallel_img.save(fname) {
-        Ok(_) => {println!("{} saved",fname); }
-        Err(_) => {println!("Error!");}
+    let rect = Rect::at(4, 5).of_size(60, 27);
+    let red = Rgb([255u8,0u8,0u8]);
+   
+
+   let new_img = add_config_watermark(&parallel_img,&config,parallel_time);
+
+    match new_img.save(out_file.clone()) {
+        Ok(_) => {println!("{} saved",out_file.display()); }
+        Err(err) => {println!("Error saving file: {}",err);}
     };
 }
 
